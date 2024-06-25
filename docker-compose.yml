@@ -1,0 +1,54 @@
+version: '3.8'
+
+services:
+  py_django:
+    container_name: py_django
+    build: ./
+    command: bash -c 'while !</dev/tcp/py_db/5432; do sleep 1; done; python manage.py migrate && python manage.py runserver 0.0.0.0:8000'
+    volumes:
+      - ./app:/app
+    ports:
+      - "127.0.0.1:8000:8000"
+    environment:
+      - DEBUG=${DEBUG}
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@py_db:5432/${POSTGRES_DB}
+    depends_on:
+      - py_db
+    env_file:
+      - ./.env
+    restart: always
+
+  py_db:
+    container_name: py_db
+    image: postgres:15-alpine
+    volumes:
+      - py_data:/var/lib/postgresql@15/data/
+    expose:
+      - 5432
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+    env_file:
+      - ./.env
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: always
+
+  py_pgadmin:
+    container_name: py_pgadmin
+    image: dpage/pgadmin4
+    ports:
+      - "8088:80"
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@example.com
+      PGADMIN_DEFAULT_PASSWORD: postgres
+    depends_on:
+      - py_db
+    restart: always
+
+volumes:
+  py_data:
